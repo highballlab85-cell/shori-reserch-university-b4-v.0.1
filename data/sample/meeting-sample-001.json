@@ -1,0 +1,97 @@
+{
+  "meeting_id": "sample-001",
+  "topic": "9月スプリント準備",
+  "utterances": [
+    {
+      "turn": 1,
+      "timestamp": "00:00:05",
+      "speaker": "Alice",
+      "text": "Bob、金曜までにプロジェクト計画をアップデートしておいて。",
+      "act": "ASSIGN",
+      "commitment_id": "C1",
+      "task": "プロジェクト計画更新",
+      "owner": "Bob",
+      "due": "2025-09-19"
+    },
+    {
+      "turn": 2,
+      "timestamp": "00:00:12",
+      "speaker": "Bob",
+      "text": "了解、金曜までに更新版を上げます。",
+      "act": "CONFIRM",
+      "commitment_id": "C1"
+    },
+    {
+      "turn": 3,
+      "timestamp": "00:01:03",
+      "speaker": "Carol",
+      "text": "Bob、仕様の差分レポートもまとめられる？",
+      "act": "ASSIGN",
+      "commitment_id": "C2",
+      "task": "仕様差分レポート",
+      "owner": "Bob",
+      "due": "2025-09-18"
+    },
+    {
+      "turn": 4,
+      "timestamp": "00:01:10",
+      "speaker": "Bob",
+      "text": "差分レポートは木曜までにまとめます。",
+      "act": "CONFIRM",
+      "commitment_id": "C2"
+    },
+    {
+      "turn": 5,
+      "timestamp": "00:05:40",
+      "speaker": "Alice",
+      "text": "Carol、C1は締切を月曜に延ばしてもらえる？",
+      "act": "REVISE",
+      "commitment_id": "C1",
+      "new_due": "2025-09-22"
+    },
+    {
+      "turn": 6,
+      "timestamp": "00:05:48",
+      "speaker": "Carol",
+      "text": "それで問題ないです。",
+      "act": "CONFIRM",
+      "commitment_id": "C1"
+    },
+    {
+      "turn": 7,
+      "timestamp": "00:08:15",
+      "speaker": "Bob",
+      "text": "C2の差分レポート、実は既にキャンセルしていいか？",
+      "act": "CANCEL",
+      "commitment_id": "C2",
+      "reason": "要件変更"
+    },
+    {
+      "turn": 8,
+      "timestamp": "00:08:22",
+      "speaker": "Alice",
+      "text": "待って、差分レポートは引き続き必要。",
+      "act": "REVISE",
+      "commitment_id": "C2",
+      "new_owner": "Alice",
+      "new_due": "2025-09-19"
+    },
+    {
+      "turn": 9,
+      "timestamp": "00:08:30",
+      "speaker": "Alice",
+      "text": "私が金曜までに差分レポートまとめます。",
+      "act": "CONFIRM",
+      "commitment_id": "C2"
+    },
+    {
+      "turn": 10,
+      "timestamp": "00:09:05",
+      "speaker": "Bob",
+      "text": "でもC2の作業はもう進めなくていいんだよね。",
+      "act": "CANCEL",
+      "commitment_id": "C2",
+      "reason": "作業重複を避ける"
+    }
+  ]
+}
