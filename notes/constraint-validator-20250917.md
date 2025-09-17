@@ -29,3 +29,9 @@
 2. `ConstraintSummary` を `c2_batch_report.py` に統合し、バッチレポートにも CP ステータス列を表示。
 3. Common Ground 由来の `open_questions` 表現を Schema/Model に追加し、介入提案文生成と連動。
 4. LLM-as-a-judge 用スクリプトに `ConstraintSummary` を入力し、違反説明の具体性スコアリングを自動化。
+
+## 追補 (Open Question モデル追加 / バッチ連携強化)
+- JSONスキーマに `open_questions` と `question_refs` を追加し、QUD管理情報を保持できるようにした。
+- `scripts/prototype/c2_models.py` に `OpenQuestion` モデルと `MeetingRecord.unresolved_questions` ヘルパを実装し、今後の介入提案ロジックで未解決問いを直接参照可能。
+- `scripts/prototype/c2_batch_report.py` を制約バリデータと統合し、CPステータスと制約違反件数を会議ごと・全体集計に追記。出力例は `runs/20250917-c2-constraint/batch_report_with_constraints.md` を参照。
+

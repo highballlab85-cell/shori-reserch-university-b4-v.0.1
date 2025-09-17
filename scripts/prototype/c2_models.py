@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 ActLiteral = Literal["ASSIGN", "CONFIRM", "REVISE", "CANCEL", "OTHER"]
 
 
+class QuestionStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+
 class CommitmentStateEnum(int, Enum):
     """コミットメント状態の簡易ステートマシン表現。"""
 
@@ -21,6 +26,43 @@ class CommitmentStateEnum(int, Enum):
     CONFIRMED = 2
     REVISED_PENDING = 3
     CANCELLED = 4
+
+
+
+class OpenQuestion(BaseModel):
+    question_id: str = Field(..., min_length=2)
+    text: str
+    status: QuestionStatus = QuestionStatus.OPEN
+    raised_by: Optional[str] = None
+    raised_turn: Optional[int] = Field(default=None, ge=1)
+    resolved_by: Optional[str] = None
+    resolved_turn: Optional[int] = Field(default=None, ge=1)
+    commitment_refs: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+    @field_validator("question_id")
+    @classmethod
+    def _validate_question_id(cls, value: str) -> str:
+        if not value.startswith("Q"):
+            raise ValueError("question_id must start with 'Q'")
+        return value
+
+    @field_validator("commitment_refs")
+    @classmethod
+    def _sanitize_commitment_refs(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return value
+        filtered = [ref for ref in value if ref]
+        if len(filtered) != len(value):
+            raise ValueError("commitment_refs must not contain empty strings")
+        return list(dict.fromkeys(filtered))
+
+    @model_validator(mode="after")
+    def _validate_resolution(self) -> "OpenQuestion":
+        if self.status == QuestionStatus.RESOLVED:
+            if not (self.resolved_by and self.resolved_turn):
+                raise ValueError("resolved questions require resolved_by and resolved_turn")
+        return self
 
 
 class UtteranceEvent(BaseModel):
@@ -36,8 +78,22 @@ class UtteranceEvent(BaseModel):
     new_owner: Optional[str] = None
     new_due: Optional[str] = None
     reason: Optional[str] = None
+    question_refs: Optional[List[str]] = None
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     metadata: Optional[dict] = None
+
+    @field_validator("question_refs")
+    @classmethod
+    def _validate_question_refs(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return value
+        filtered = [ref for ref in value if ref]
+        if len(filtered) != len(value):
+            raise ValueError("question_refs must not contain empty strings")
+        for ref in filtered:
+            if not ref.startswith("Q"):
+                raise ValueError("question_refs entries must start with 'Q'")
+        return list(dict.fromkeys(filtered))
 
     @field_validator("confidence")
     @classmethod
@@ -60,12 +116,45 @@ class MeetingRecord(BaseModel):
     topic: Optional[str] = None
     datetime: Optional[str] = None
     participants: Optional[List[str]] = None
+    open_questions: Optional[List[OpenQuestion]] = None
     utterances: List[UtteranceEvent]
+
+    @field_validator("open_questions", mode="after")
+    @classmethod
+    def _sanitize_open_questions(cls, value: Optional[List[OpenQuestion]]) -> Optional[List[OpenQuestion]]:
+        if value is None:
+            return value
+        seen = set()
+        ordered: List[OpenQuestion] = []
+        for question in value:
+            if question.question_id in seen:
+                raise ValueError(f"duplicated question_id detected: {question.question_id}")
+            seen.add(question.question_id)
+            ordered.append(question)
+        return ordered
 
     @field_validator("utterances", mode="after")
     @classmethod
     def _ensure_sorted(cls, value: Iterable[UtteranceEvent]) -> List[UtteranceEvent]:
         return sorted(list(value), key=lambda ev: ev.turn)
+
+    @model_validator(mode="after")
+    def _validate_question_links(self) -> "MeetingRecord":
+        question_ids = {q.question_id for q in self.open_questions or []}
+        for event in self.utterances:
+            if event.question_refs:
+                unknown = [ref for ref in event.question_refs if ref not in question_ids]
+                if unknown:
+                    raise ValueError(
+                        f"Utterance turn {event.turn} references unknown questions: {unknown}"
+                    )
+        return self
+
+    def open_question_index(self) -> Dict[str, OpenQuestion]:
+        return {q.question_id: q for q in self.open_questions or []}
+
+    def unresolved_questions(self) -> List[OpenQuestion]:
+        return [q for q in self.open_questions or [] if q.status == QuestionStatus.OPEN]
 
     def commitments(self) -> Dict[str, List[UtteranceEvent]]:
         bucket: Dict[str, List[UtteranceEvent]] = {}

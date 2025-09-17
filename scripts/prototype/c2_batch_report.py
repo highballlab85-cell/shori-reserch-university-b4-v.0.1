@@ -21,18 +21,30 @@ if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
 import c2_graph_baseline as baseline  # noqa: E402
+try:
+    from constraint_validator import ConstraintValidator
+except ModuleNotFoundError:
+    import sys
+    if str(CURRENT_DIR) not in sys.path:
+        sys.path.insert(0, str(CURRENT_DIR))
+    from constraint_validator import ConstraintValidator
 
 
 def gather_json_files(input_dir: Path) -> List[Path]:
     return sorted(p for p in input_dir.glob("*.json") if p.is_file())
 
 
-def format_meeting_section(meeting_path: Path, result: Dict[str, object]) -> str:
-    metrics = result.get("metrics", {})
-    contradictions = result.get("contradictions", [])
+def format_meeting_section(
+    meeting_path: Path,
+    baseline_result: Dict[str, object],
+    constraint_summary,
+) -> str:
+    metrics = baseline_result.get("metrics", {})
+    contradictions = baseline_result.get("contradictions", [])
     lines: List[str] = []
-    lines.append(f"### {result['meeting_id']} ({meeting_path.name})")
-    lines.append(f"- トピック: {result.get('topic', 'N/A')}")
+    lines.append(f"### {baseline_result['meeting_id']} ({meeting_path.name})")
+    lines.append(f"- トピック: {baseline_result.get('topic', 'N/A')}")
+    lines.append(f"- 制約違反件数: {constraint_summary.violation_count}")
     lines.append(
         "- コミットメント: {count} / 矛盾コミットメント: {contradicted} / 矛盾率: {rate:.2f}".format(
             count=metrics.get("total_commitments", 0),
@@ -40,6 +52,18 @@ def format_meeting_section(meeting_path: Path, result: Dict[str, object]) -> str
             rate=metrics.get("contradiction_rate", 0.0),
         )
     )
+    if constraint_summary.cp_status:
+        status_line = ", ".join(f"{cid}:{status}" for cid, status in constraint_summary.cp_status.items())
+        lines.append(f"- CPステータス: {status_line}")
+    if constraint_summary.violations:
+        lines.append("- 制約違反詳細:")
+        for violation in constraint_summary.violations:
+            speaker = f" (話者: {violation.speaker})" if violation.speaker else ""
+            lines.append(
+                f"  - turn{violation.turn} {violation.commitment_id}: {violation.violation_type} | {violation.description}{speaker}"
+            )
+    else:
+        lines.append("- 制約違反詳細: なし")
     if contradictions:
         lines.append("- 検出矛盾:")
         for item in contradictions:
@@ -61,34 +85,48 @@ def format_meeting_section(meeting_path: Path, result: Dict[str, object]) -> str
     return "\n".join(lines)
 
 
-def aggregate_metrics(results: List[Dict[str, object]]) -> Dict[str, object]:
-    total_commitments = sum(r["metrics"]["total_commitments"] for r in results)
-    total_contradictions = sum(r["metrics"]["contradiction_count"] for r in results)
-    total_contradicted = sum(r["metrics"]["contradicted_commitments"] for r in results)
+def aggregate_metrics(
+    baseline_results: List[Dict[str, object]],
+    constraint_summaries,
+) -> Dict[str, object]:
+    total_commitments = sum(r["metrics"]["total_commitments"] for r in baseline_results)
+    total_contradictions = sum(r["metrics"]["contradiction_count"] for r in baseline_results)
+    total_contradicted = sum(r["metrics"]["contradicted_commitments"] for r in baseline_results)
+    total_constraint_violations = sum(summary.violation_count for summary in constraint_summaries)
 
     type_counter: Dict[str, int] = {}
-    for r in results:
+    for r in baseline_results:
         for key, value in r["metrics"]["contradiction_types"].items():
             type_counter[key] = type_counter.get(key, 0) + value
 
+    cp_status_counts: Dict[str, int] = {}
+    for summary in constraint_summaries:
+        for status in summary.cp_status.values():
+            cp_status_counts[status] = cp_status_counts.get(status, 0) + 1
+
     return {
-        "meetings": len(results),
+        "meetings": len(baseline_results),
         "total_commitments": total_commitments,
         "contradiction_count": total_contradictions,
         "contradicted_commitments": total_contradicted,
         "contradiction_rate": total_contradicted / total_commitments if total_commitments else 0.0,
         "contradiction_types": dict(sorted(type_counter.items())),
+        "constraint_violations": total_constraint_violations,
+        "cp_status_counts": cp_status_counts,
     }
 
 
-def render_report(results: List[Tuple[Path, Dict[str, object]]], aggregate: Dict[str, object]) -> str:
+def render_report(
+    results: List[Tuple[Path, Dict[str, object], object]],
+    aggregate: Dict[str, object],
+) -> str:
     lines: List[str] = []
     lines.append("# C2-Graph 矛盾検出バッチレポート")
     lines.append("")
     lines.append("## 会議別サマリ")
     lines.append("")
-    for meeting_path, result in results:
-        lines.append(format_meeting_section(meeting_path, result))
+    for meeting_path, baseline_result, constraint_summary in results:
+        lines.append(format_meeting_section(meeting_path, baseline_result, constraint_summary))
     lines.append("## 集計結果")
     lines.append("")
     lines.append(f"- 会議数: {aggregate['meetings']}")
@@ -100,10 +138,15 @@ def render_report(results: List[Tuple[Path, Dict[str, object]]], aggregate: Dict
         )
     )
     lines.append(f"- 矛盾総数: {aggregate['contradiction_count']}")
-    if aggregate["contradiction_types"]:
-        lines.append("- 矛盾タイプ内訳:")
-        for key, value in aggregate["contradiction_types"].items():
+    lines.append(f"- 制約違反総数: {aggregate['constraint_violations']}")
+    if aggregate['contradiction_types']:
+        lines.append('- 矛盾タイプ内訳:')
+        for key, value in aggregate['contradiction_types'].items():
             lines.append(f"  - {key}: {value}")
+    if aggregate['cp_status_counts']:
+        lines.append('- CPステータス集計:')
+        for status, count in aggregate['cp_status_counts'].items():
+            lines.append(f"  - {status}: {count}")
     return "\n".join(lines)
 
 
@@ -117,13 +160,19 @@ def main() -> None:
     if not meeting_paths:
         raise SystemExit("入力ディレクトリにJSONファイルがありません")
 
+    validator = ConstraintValidator()
     results: List = []
+    baseline_results: List[Dict[str, object]] = []
+    constraint_summaries = []
     for path in meeting_paths:
         meeting = baseline.load_meeting(path)
-        result = baseline.analyse_meeting(meeting)
-        results.append((path, result))
+        baseline_result = baseline.analyse_meeting(meeting)
+        constraint_summary = validator.validate(meeting)
+        results.append((path, baseline_result, constraint_summary))
+        baseline_results.append(baseline_result)
+        constraint_summaries.append(constraint_summary)
 
-    aggregate = aggregate_metrics([r for _, r in results])
+    aggregate = aggregate_metrics(baseline_results, constraint_summaries)
     report = render_report(results, aggregate)
 
     if args.output:

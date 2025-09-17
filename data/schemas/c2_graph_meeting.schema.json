@@ -29,6 +29,13 @@
         "type": "string"
       }
     },
+    "open_questions": {
+      "type": "array",
+      "description": "List of outstanding questions (QUD) tracked during the meeting.",
+      "items": {
+        "$ref": "#/definitions/openQuestion"
+      }
+    },
     "utterances": {
       "type": "array",
       "minItems": 1,
@@ -42,6 +49,64 @@
       "type": "string",
       "pattern": "^\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?$",
       "description": "Relative timestamp in HH:MM:SS or HH:MM:SS.mmm format."
+    },
+    "openQuestion": {
+      "type": "object",
+      "required": [
+        "question_id",
+        "text",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "pattern": "^Q[0-9A-Za-z_-]+$",
+          "description": "Stable identifier used to reference the question from utterances."
+        },
+        "text": {
+          "type": "string",
+          "description": "Natural language description of the outstanding question."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "resolved"
+          ],
+          "description": "Lifecycle state of the question following QUD tracking."
+        },
+        "raised_by": {
+          "type": "string",
+          "description": "Speaker label that initially raised the question."
+        },
+        "raised_turn": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Turn index at which the question was raised."
+        },
+        "resolved_by": {
+          "type": "string",
+          "description": "Speaker label that marked the question as resolved."
+        },
+        "resolved_turn": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Turn index when the resolution was declared."
+        },
+        "commitment_refs": {
+          "type": "array",
+          "description": "Optional list of commitment IDs related to the question.",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-form analyst note about the question."
+        }
+      }
     },
     "utteranceEvent": {
       "type": "object",
@@ -111,6 +176,14 @@
         "reason": {
           "type": "string",
           "description": "Free-form rationale given for the action."
+        },
+        "question_refs": {
+          "type": "array",
+          "description": "List of question IDs referenced or resolved in this utterance.",
+          "items": {
+            "type": "string",
+            "pattern": "^Q[0-9A-Za-z_-]+$"
+          }
         },
         "confidence": {
           "type": "number",
