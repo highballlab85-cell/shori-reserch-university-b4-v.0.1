@@ -7,6 +7,8 @@
 - 未割り当てのコミットメントに対する CANCEL
 - オーナー以外による CANCEL
 - すでにキャンセル済みのコミットメントに対する重複 CANCEL
+- REVISE 後に確認(CONFIRM)される前の CANCEL
+- ASSIGN / REVISE の確認待ち状態が指定時間を過ぎた場合（将来対応予定）
 
 出力はテキストレポートとして stdout へ。--output を指定するとファイルにも保存する。
 """
@@ -14,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -31,6 +34,7 @@ class CommitmentState:
     due: Optional[str] = None
     status: str = "assigned"
     history: List[dict] = field(default_factory=list)
+    requires_confirmation: bool = False
 
     def record(self, event: dict) -> None:
         self.history.append(event)
@@ -76,6 +80,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             state.owner = event.get("owner", state.owner)
             state.due = event.get("due", state.due)
             state.status = "assigned"
+            state.requires_confirmation = True
             state.record(event)
         elif act == "CONFIRM":
             if state is None:
@@ -83,6 +88,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             # CONFIRM の発話者をオーナーとして上書き（暫定仕様）
             state.owner = state.owner or event.get("owner") or event.get("speaker")
             state.status = "confirmed"
+            state.requires_confirmation = False
             state.record(event)
         elif act == "REVISE":
             if state is None:
@@ -92,6 +98,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             if "new_due" in event:
                 state.due = event["new_due"]
             state.status = "revised"
+            state.requires_confirmation = True
             state.record(event)
         elif act == "CANCEL":
             if state is None:
@@ -125,7 +132,18 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                         "detail": "既にCANCEL済みのコミットメント",
                     }
                 )
+            if state.requires_confirmation:
+                contradictions.append(
+                    {
+                        "turn": event["turn"],
+                        "commitment_id": cid,
+                        "type": "cancel_before_confirmation",
+                        "speaker": event["speaker"],
+                        "detail": "REVISE/ASSIGN の確認前にCANCEL",
+                    }
+                )
             state.status = "cancelled"
+            state.requires_confirmation = False
             state.record(event)
         else:
             # 未定義のアクトは履歴に記録した上でスキップ
@@ -135,12 +153,32 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
 
     graph = build_graph(meeting["utterances"])
 
+    metrics = summarise_metrics(commitments, contradictions)
+
     return {
         "meeting_id": meeting["meeting_id"],
         "topic": meeting.get("topic"),
         "commitments": commitments,
         "contradictions": contradictions,
         "graph": graph,
+        "metrics": metrics,
+    }
+
+
+def summarise_metrics(commitments: Dict[str, CommitmentState], contradictions: List[dict]) -> Dict[str, object]:
+    total_commitments = len(commitments)
+    contradiction_count = len(contradictions)
+    contradicted_commitments = len({c["commitment_id"] for c in contradictions})
+    type_counter = Counter(c["type"] for c in contradictions)
+    contradiction_rate = (
+        contradicted_commitments / total_commitments if total_commitments else 0.0
+    )
+    return {
+        "total_commitments": total_commitments,
+        "contradiction_count": contradiction_count,
+        "contradicted_commitments": contradicted_commitments,
+        "contradiction_rate": contradiction_rate,
+        "contradiction_types": dict(sorted(type_counter.items())),
     }
 
 
@@ -167,6 +205,23 @@ def render_report(result: Dict[str, object]) -> str:
             )
     lines.append("")
     lines.append(f"矛盾総数: {len(contradictions)}")
+
+    metrics = result.get("metrics", {})
+    if metrics:
+        lines.append("")
+        lines.append("## 指標サマリ")
+        lines.append(
+            f"- コミットメント数: {metrics['total_commitments']}"
+            f" / 矛盾検出コミットメント数: {metrics['contradicted_commitments']}"
+        )
+        lines.append(
+            f"- 矛盾率: {metrics['contradiction_rate']:.2f}"
+            f" (矛盾総数: {metrics['contradiction_count']})"
+        )
+        if metrics.get("contradiction_types"):
+            lines.append("- 矛盾タイプ内訳:")
+            for key, value in metrics["contradiction_types"].items():
+                lines.append(f"  - {key}: {value}")
 
     return "\n".join(lines)
 

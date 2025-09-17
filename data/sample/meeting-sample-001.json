@@ -92,6 +92,36 @@
       "act": "CANCEL",
       "commitment_id": "C2",
       "reason": "作業重複を避ける"
+    },
+    {
+      "turn": 11,
+      "timestamp": "00:10:20",
+      "speaker": "Carol",
+      "text": "Dave、プレゼン資料のドラフトを明日までにお願い。",
+      "act": "ASSIGN",
+      "commitment_id": "C3",
+      "task": "プレゼン資料ドラフト",
+      "owner": "Dave",
+      "due": "2025-09-18"
+    },
+    {
+      "turn": 12,
+      "timestamp": "00:10:45",
+      "speaker": "Alice",
+      "text": "C3は締切を金曜に延ばして、オーナーは私に切り替えておくね。",
+      "act": "REVISE",
+      "commitment_id": "C3",
+      "new_owner": "Alice",
+      "new_due": "2025-09-19"
+    },
+    {
+      "turn": 13,
+      "timestamp": "00:11:05",
+      "speaker": "Dave",
+      "text": "了解、じゃあC3はキャンセルしておくよ。",
+      "act": "CANCEL",
+      "commitment_id": "C3",
+      "reason": "オーナー変更後の調整漏れ"
     }
   ]
 }
