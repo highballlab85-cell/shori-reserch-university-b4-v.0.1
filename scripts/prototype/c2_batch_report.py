@@ -43,13 +43,16 @@ def format_meeting_section(meeting_path: Path, result: Dict[str, object]) -> str
     if contradictions:
         lines.append("- 検出矛盾:")
         for item in contradictions:
+            suggestion = item.get("suggestion")
+            suggestion_suffix = f" | 提案: {suggestion}" if suggestion else ""
             lines.append(
-                "  - turn{turn} {cid}: {ctype} ({detail}) 発話者={speaker}".format(
+                "  - turn{turn} {cid}: {ctype} ({detail}) 発話者={speaker}{suggestion}".format(
                     turn=item["turn"],
                     cid=item["commitment_id"],
                     ctype=item["type"],
                     detail=item["detail"],
                     speaker=item["speaker"],
+                    suggestion=suggestion_suffix,
                 )
             )
     else:

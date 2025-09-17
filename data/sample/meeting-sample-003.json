@@ -1,0 +1,72 @@
+{
+  "meeting_id": "sample-003",
+  "topic": "リリース前レビュー調整",
+  "utterances": [
+    {
+      "turn": 1,
+      "timestamp": "00:00:08",
+      "speaker": "Carol",
+      "text": "Eve、日曜までにQAチェックリストをまとめてくれる？",
+      "act": "ASSIGN",
+      "commitment_id": "C4",
+      "task": "QAチェックリスト作成",
+      "owner": "Eve",
+      "due": "2025-09-21"
+    },
+    {
+      "turn": 2,
+      "timestamp": "00:00:15",
+      "speaker": "Eve",
+      "text": "了解、日曜までに仕上げます。",
+      "act": "CONFIRM",
+      "commitment_id": "C4"
+    },
+    {
+      "turn": 3,
+      "timestamp": "00:01:40",
+      "speaker": "Frank",
+      "text": "C4は僕の方でキャンセルしておくよ。",
+      "act": "CANCEL",
+      "commitment_id": "C4",
+      "reason": "タスク重複と認識"
+    },
+    {
+      "turn": 4,
+      "timestamp": "00:01:55",
+      "speaker": "Eve",
+      "text": "ちょっと待って、確認なしに消さないで。私が改めてキャンセル処理しておくね。",
+      "act": "CANCEL",
+      "commitment_id": "C4",
+      "reason": "手動でアーカイブ"
+    },
+    {
+      "turn": 5,
+      "timestamp": "00:02:10",
+      "speaker": "Dave",
+      "text": "C5は今回は不要だからキャンセルで。",
+      "act": "CANCEL",
+      "commitment_id": "C5",
+      "reason": "スコープ外"
+    },
+    {
+      "turn": 6,
+      "timestamp": "00:03:05",
+      "speaker": "Bob",
+      "text": "Gina、火曜までにUIデモを作ってもらえる？",
+      "act": "ASSIGN",
+      "commitment_id": "C6",
+      "task": "UIデモ作成",
+      "owner": "Gina",
+      "due": "2025-09-23"
+    },
+    {
+      "turn": 7,
+      "timestamp": "00:03:18",
+      "speaker": "Gina",
+      "text": "ごめん、今週は余裕がないのでC6は一旦キャンセルさせて。",
+      "act": "CANCEL",
+      "commitment_id": "C6",
+      "reason": "リソース不足"
+    }
+  ]
+}

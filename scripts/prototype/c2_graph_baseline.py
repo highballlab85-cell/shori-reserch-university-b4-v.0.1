@@ -66,6 +66,21 @@ def build_graph(events: List[dict]):
     return graph
 
 
+CONTRADICTION_SUGGESTIONS = {
+    "cancel_without_assignment": "ASSIGNの記録が残っているか確認し、割り当て情報を明示した上でキャンセルを宣言する。",
+    "unauthorized_cancel": "コミットメントのオーナー本人、または合意を得たファシリテータがキャンセルを宣言できる状況に揃える。",
+    "duplicate_cancel": "一度キャンセルした場合は進行ログを共有し、重複報告を避ける運用にする。",
+    "cancel_before_confirmation": "REVISE/ASSIGN後は担当者のCONFIRMを待ち、必要に応じてリマインドを送る。",
+}
+
+
+def suggest_action(contradiction_type: str) -> str:
+    return CONTRADICTION_SUGGESTIONS.get(
+        contradiction_type,
+        "矛盾の原因を確認し、担当者全員で是正手順を合意する。",
+    )
+
+
 def analyse_meeting(meeting: dict) -> Dict[str, object]:
     commitments: Dict[str, CommitmentState] = {}
     contradictions: List[dict] = []
@@ -102,6 +117,10 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             state.record(event)
         elif act == "CANCEL":
             if state is None:
+                state = commitments.setdefault(cid, CommitmentState(cid))
+                state.status = "cancelled"
+                state.requires_confirmation = False
+                state.record(event)
                 contradictions.append(
                     {
                         "turn": event["turn"],
@@ -109,6 +128,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                         "type": "cancel_without_assignment",
                         "speaker": event["speaker"],
                         "detail": "ASSIGN前にCANCELが発生",
+                        "suggestion": suggest_action("cancel_without_assignment"),
                     }
                 )
                 continue
@@ -120,6 +140,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                         "type": "unauthorized_cancel",
                         "speaker": event["speaker"],
                         "detail": f"オーナー({state.owner})以外がCANCEL",
+                        "suggestion": suggest_action("unauthorized_cancel"),
                     }
                 )
             elif state.status == "cancelled":
@@ -130,6 +151,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                         "type": "duplicate_cancel",
                         "speaker": event["speaker"],
                         "detail": "既にCANCEL済みのコミットメント",
+                        "suggestion": suggest_action("duplicate_cancel"),
                     }
                 )
             if state.requires_confirmation:
@@ -140,6 +162,7 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                         "type": "cancel_before_confirmation",
                         "speaker": event["speaker"],
                         "detail": "REVISE/ASSIGN の確認前にCANCEL",
+                        "suggestion": suggest_action("cancel_before_confirmation"),
                     }
                 )
             state.status = "cancelled"
@@ -200,8 +223,10 @@ def render_report(result: Dict[str, object]) -> str:
         lines.append("- 矛盾なし")
     else:
         for item in contradictions:
+            suggestion = item.get("suggestion")
+            suggestion_suffix = f" | 提案: {suggestion}" if suggestion else ""
             lines.append(
-                f"- turn{item['turn']} {item['commitment_id']}: {item['type']} ({item['detail']}) 発話者={item['speaker']}"
+                f"- turn{item['turn']} {item['commitment_id']}: {item['type']} ({item['detail']}) 発話者={item['speaker']}{suggestion_suffix}"
             )
     lines.append("")
     lines.append(f"矛盾総数: {len(contradictions)}")
