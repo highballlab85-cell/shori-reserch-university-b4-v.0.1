@@ -1,0 +1,61 @@
+{
+  "meeting_id": "sample-002",
+  "topic": "10月リリース準備",
+  "utterances": [
+    {
+      "turn": 1,
+      "timestamp": "00:00:03",
+      "speaker": "Alice",
+      "text": "Eve、QAチェックリストを明日までに仕上げてください。",
+      "act": "ASSIGN",
+      "commitment_id": "C10",
+      "task": "QAチェックリスト",
+      "owner": "Eve",
+      "due": "2025-09-18"
+    },
+    {
+      "turn": 2,
+      "timestamp": "00:00:10",
+      "speaker": "Eve",
+      "text": "了解、明日中に完了させます。",
+      "act": "CONFIRM",
+      "commitment_id": "C10"
+    },
+    {
+      "turn": 3,
+      "timestamp": "00:02:45",
+      "speaker": "Bob",
+      "text": "Frank、サーバーのメンテスケジュールを共有して。",
+      "act": "ASSIGN",
+      "commitment_id": "C11",
+      "task": "メンテスケジュール共有",
+      "owner": "Frank",
+      "due": "2025-09-19"
+    },
+    {
+      "turn": 4,
+      "timestamp": "00:02:55",
+      "speaker": "Frank",
+      "text": "了解、今晩中にまとめて送ります。",
+      "act": "CONFIRM",
+      "commitment_id": "C11"
+    },
+    {
+      "turn": 5,
+      "timestamp": "00:08:10",
+      "speaker": "Alice",
+      "text": "C10の期限を月曜まで延ばすね。",
+      "act": "REVISE",
+      "commitment_id": "C10",
+      "new_due": "2025-09-22"
+    },
+    {
+      "turn": 6,
+      "timestamp": "00:08:18",
+      "speaker": "Eve",
+      "text": "了解、月曜までに出します。",
+      "act": "CONFIRM",
+      "commitment_id": "C10"
+    }
+  ]
+}
