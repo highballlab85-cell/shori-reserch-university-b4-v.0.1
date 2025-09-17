@@ -37,6 +37,13 @@ crontab -e
 */10 * * * * cd /path/to/your/repo && bash scripts/auto-commit-push.sh . >> logs/auto-commit.log 2>&1
 ```
 
+### リアルタイム監視（任意）
+
+- `scripts/watch-auto-commit-push.sh` を使うと、`fswatch` がある環境ではファイル変更を検知して即時に `auto-commit-push.sh` を呼び出します。
+- 依存: `fswatch`（推奨）。未導入の場合は自動的にポーリング（既定15秒間隔）。
+- 使い方: `bash scripts/watch-auto-commit-push.sh .` を実行し、プロセスを常駐させておきます。`POLL_INTERVAL` や `QUIET_PERIOD` を環境変数で上書きできます。
+- サービス化する場合は `launchd` や `systemd` などで常駐実行させてください。
+
 ---
 
 ## 先にやっておくこと
@@ -51,4 +58,3 @@ git pull --rebase origin main || true       # 初回は存在しない場合も�
 ```
 
 > 認証は初回の `git push` で求められます。Windows は Git Credential Manager、macOS は Keychain、Linux は credential store などを利用してください。
-
