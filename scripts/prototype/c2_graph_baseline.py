@@ -26,6 +26,14 @@ try:
 except ImportError:  # networkxが未インストールでも動作可能にする
     nx = None
 
+try:
+    from .c2_models import MeetingRecord, UtteranceEvent
+except ImportError:
+    import sys
+    CURRENT_DIR = Path(__file__).resolve().parent
+    if str(CURRENT_DIR) not in sys.path:
+        sys.path.append(str(CURRENT_DIR))
+    from c2_models import MeetingRecord, UtteranceEvent
 
 @dataclass
 class CommitmentState:
@@ -36,33 +44,35 @@ class CommitmentState:
     history: List[dict] = field(default_factory=list)
     requires_confirmation: bool = False
 
-    def record(self, event: dict) -> None:
-        self.history.append(event)
+    def record(self, event: UtteranceEvent) -> None:
+        self.history.append(event.model_dump())
 
 
-def load_meeting(path: Path) -> dict:
+def load_meeting(path: Path) -> MeetingRecord:
     with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    return MeetingRecord.model_validate(data)
 
 
-def build_graph(events: List[dict]):
+def build_graph(events: List[UtteranceEvent]):
     graph = None
     if nx is not None:
         graph = nx.DiGraph()
         for event in events:
-            node = f"commitment:{event['commitment_id']}"
-            if not graph.has_node(node):
+            node = f"commitment:{event.commitment_id}"
+            if event.commitment_id and not graph.has_node(node):
                 graph.add_node(node, type="commitment")
-            speaker_node = f"speaker:{event['speaker']}"
+            speaker_node = f"speaker:{event.speaker}"
             if not graph.has_node(speaker_node):
                 graph.add_node(speaker_node, type="speaker")
-            graph.add_edge(
-                speaker_node,
-                node,
-                act=event["act"],
-                turn=event["turn"],
-                timestamp=event["timestamp"],
-            )
+            if event.commitment_id:
+                graph.add_edge(
+                    speaker_node,
+                    node,
+                    act=event.act,
+                    turn=event.turn,
+                    timestamp=event.timestamp,
+                )
     return graph
 
 
@@ -81,37 +91,38 @@ def suggest_action(contradiction_type: str) -> str:
     )
 
 
-def analyse_meeting(meeting: dict) -> Dict[str, object]:
+def analyse_meeting(meeting: MeetingRecord) -> Dict[str, object]:
     commitments: Dict[str, CommitmentState] = {}
     contradictions: List[dict] = []
 
-    for event in meeting["utterances"]:
-        act = event["act"].upper()
-        cid = event["commitment_id"]
+    for event in meeting.utterances:
+        act = event.act.upper()
+        cid = event.commitment_id
+        if not cid:
+            continue
         state = commitments.get(cid)
 
         if act == "ASSIGN":
             state = commitments.setdefault(cid, CommitmentState(cid))
-            state.owner = event.get("owner", state.owner)
-            state.due = event.get("due", state.due)
+            state.owner = event.owner or state.owner
+            state.due = event.due or state.due
             state.status = "assigned"
             state.requires_confirmation = True
             state.record(event)
         elif act == "CONFIRM":
             if state is None:
                 state = commitments.setdefault(cid, CommitmentState(cid))
-            # CONFIRM の発話者をオーナーとして上書き（暫定仕様）
-            state.owner = state.owner or event.get("owner") or event.get("speaker")
+            state.owner = state.owner or event.owner or event.speaker
             state.status = "confirmed"
             state.requires_confirmation = False
             state.record(event)
         elif act == "REVISE":
             if state is None:
                 state = commitments.setdefault(cid, CommitmentState(cid))
-            if "new_owner" in event:
-                state.owner = event["new_owner"]
-            if "new_due" in event:
-                state.due = event["new_due"]
+            if event.new_owner:
+                state.owner = event.new_owner
+            if event.new_due:
+                state.due = event.new_due
             state.status = "revised"
             state.requires_confirmation = True
             state.record(event)
@@ -123,22 +134,22 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                 state.record(event)
                 contradictions.append(
                     {
-                        "turn": event["turn"],
+                        "turn": event.turn,
                         "commitment_id": cid,
                         "type": "cancel_without_assignment",
-                        "speaker": event["speaker"],
+                        "speaker": event.speaker,
                         "detail": "ASSIGN前にCANCELが発生",
                         "suggestion": suggest_action("cancel_without_assignment"),
                     }
                 )
                 continue
-            if state.owner and event["speaker"] != state.owner:
+            if state.owner and event.speaker != state.owner:
                 contradictions.append(
                     {
-                        "turn": event["turn"],
+                        "turn": event.turn,
                         "commitment_id": cid,
                         "type": "unauthorized_cancel",
-                        "speaker": event["speaker"],
+                        "speaker": event.speaker,
                         "detail": f"オーナー({state.owner})以外がCANCEL",
                         "suggestion": suggest_action("unauthorized_cancel"),
                     }
@@ -146,10 +157,10 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             elif state.status == "cancelled":
                 contradictions.append(
                     {
-                        "turn": event["turn"],
+                        "turn": event.turn,
                         "commitment_id": cid,
                         "type": "duplicate_cancel",
-                        "speaker": event["speaker"],
+                        "speaker": event.speaker,
                         "detail": "既にCANCEL済みのコミットメント",
                         "suggestion": suggest_action("duplicate_cancel"),
                     }
@@ -157,10 +168,10 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
             if state.requires_confirmation:
                 contradictions.append(
                     {
-                        "turn": event["turn"],
+                        "turn": event.turn,
                         "commitment_id": cid,
                         "type": "cancel_before_confirmation",
-                        "speaker": event["speaker"],
+                        "speaker": event.speaker,
                         "detail": "REVISE/ASSIGN の確認前にCANCEL",
                         "suggestion": suggest_action("cancel_before_confirmation"),
                     }
@@ -174,13 +185,13 @@ def analyse_meeting(meeting: dict) -> Dict[str, object]:
                 state = commitments.setdefault(cid, CommitmentState(cid))
             state.record(event)
 
-    graph = build_graph(meeting["utterances"])
+    graph = build_graph(meeting.utterances)
 
     metrics = summarise_metrics(commitments, contradictions)
 
     return {
-        "meeting_id": meeting["meeting_id"],
-        "topic": meeting.get("topic"),
+        "meeting_id": meeting.meeting_id,
+        "topic": meeting.topic,
         "commitments": commitments,
         "contradictions": contradictions,
         "graph": graph,

@@ -1,0 +1,60 @@
+{
+  "meeting_id": "sample-001",
+  "total_commitments": 3,
+  "violation_count": 3,
+  "violations": [
+    {
+      "commitment_id": "C2",
+      "turn": 10,
+      "violation_type": "unauthorized_cancel",
+      "description": "オーナー Alice 以外が CANCEL を実施",
+      "speaker": "Bob",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C3",
+      "turn": 13,
+      "violation_type": "unauthorized_cancel",
+      "description": "オーナー Alice 以外が CANCEL を実施",
+      "speaker": "Dave",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C3",
+      "turn": 13,
+      "violation_type": "cancel_before_confirmation",
+      "description": "REVISE/ASSIGN の確認前にCANCEL",
+      "speaker": "Dave",
+      "severity": "error"
+    }
+  ],
+  "stages": {
+    "C1": [
+      0,
+      1,
+      2,
+      3,
+      2
+    ],
+    "C2": [
+      0,
+      1,
+      2,
+      4,
+      3,
+      2,
+      4
+    ],
+    "C3": [
+      0,
+      1,
+      3,
+      4
+    ]
+  },
+  "cp_status": {
+    "C1": "SKIPPED",
+    "C2": "SKIPPED",
+    "C3": "SKIPPED"
+  }
+}

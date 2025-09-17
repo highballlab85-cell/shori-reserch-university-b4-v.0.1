@@ -1,0 +1,10 @@
+会議ID: sample-002
+
+## コミットメント状態シーケンス
+- C10: UNASSIGNED, ASSIGNED_PENDING, CONFIRMED, REVISED_PENDING, CONFIRMED
+- C11: UNASSIGNED, ASSIGNED_PENDING, CONFIRMED
+
+## 検出された違反
+- 違反なし
+
+違反件数: 0 / コミットメント総数: 2

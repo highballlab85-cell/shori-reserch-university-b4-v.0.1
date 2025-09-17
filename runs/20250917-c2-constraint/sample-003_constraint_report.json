@@ -1,0 +1,73 @@
+{
+  "meeting_id": "sample-003",
+  "total_commitments": 3,
+  "violation_count": 6,
+  "violations": [
+    {
+      "commitment_id": "C4",
+      "turn": 3,
+      "violation_type": "unauthorized_cancel",
+      "description": "オーナー Eve 以外が CANCEL を実施",
+      "speaker": "Frank",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C4",
+      "turn": 4,
+      "violation_type": "invalid_transition",
+      "description": "CANCELLED から CANCEL は許可されていない遷移",
+      "speaker": "Eve",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C4",
+      "turn": 4,
+      "violation_type": "duplicate_cancel",
+      "description": "既にキャンセル済みのコミットメントに対する重複CANCEL",
+      "speaker": "Eve",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C5",
+      "turn": 5,
+      "violation_type": "invalid_transition",
+      "description": "UNASSIGNED から CANCEL は許可されていない遷移",
+      "speaker": "Dave",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C5",
+      "turn": 5,
+      "violation_type": "cancel_without_assignment",
+      "description": "ASSIGN 前に CANCEL が発生",
+      "speaker": "Dave",
+      "severity": "error"
+    },
+    {
+      "commitment_id": "C6",
+      "turn": 7,
+      "violation_type": "cancel_before_confirmation",
+      "description": "REVISE/ASSIGN の確認前にCANCEL",
+      "speaker": "Gina",
+      "severity": "error"
+    }
+  ],
+  "stages": {
+    "C4": [
+      0,
+      1,
+      2,
+      4,
+      4
+    ],
+    "C5": [
+      0,
+      4
+    ],
+    "C6": [
+      0,
+      1,
+      4
+    ]
+  }
+}

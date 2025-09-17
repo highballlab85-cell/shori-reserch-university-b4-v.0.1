@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research.local/schemas/c2_graph_meeting.schema.json",
+  "title": "C2-Graph Meeting Record",
+  "type": "object",
+  "required": [
+    "meeting_id",
+    "utterances"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "meeting_id": {
+      "type": "string",
+      "description": "Internal identifier of the meeting transcript."
+    },
+    "topic": {
+      "type": "string",
+      "description": "Short human-readable topic label."
+    },
+    "datetime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of when the meeting started."
+    },
+    "participants": {
+      "type": "array",
+      "description": "List of speakers expected in the meeting transcript.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "utterances": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/utteranceEvent"
+      }
+    }
+  },
+  "definitions": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?$",
+      "description": "Relative timestamp in HH:MM:SS or HH:MM:SS.mmm format."
+    },
+    "utteranceEvent": {
+      "type": "object",
+      "required": [
+        "turn",
+        "timestamp",
+        "speaker",
+        "text",
+        "act"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "turn": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Absolute turn index within the meeting."
+        },
+        "timestamp": {
+          "$ref": "#/definitions/timestamp"
+        },
+        "speaker": {
+          "type": "string",
+          "description": "Speaker label (must match entries in participants if provided)."
+        },
+        "text": {
+          "type": "string",
+          "description": "Original utterance text."
+        },
+        "act": {
+          "type": "string",
+          "enum": [
+            "ASSIGN",
+            "CONFIRM",
+            "REVISE",
+            "CANCEL",
+            "OTHER"
+          ],
+          "description": "Speech act classification used by the C2-Graph pipeline."
+        },
+        "commitment_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifier that groups utterances operating on the same commitment."
+        },
+        "task": {
+          "type": "string",
+          "description": "Human-readable description of the task being negotiated."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Current owner acknowledged at this utterance."
+        },
+        "due": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO date of the due date being proposed or confirmed."
+        },
+        "new_owner": {
+          "type": "string",
+          "description": "Owner after the revision."
+        },
+        "new_due": {
+          "type": "string",
+          "format": "date",
+          "description": "Due date after the revision."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Free-form rationale given for the action."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score assigned by the extractor (if available)."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Extractor specific auxiliary information."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "act": {
+                "enum": ["ASSIGN", "CONFIRM", "REVISE", "CANCEL"]
+              }
+            }
+          },
+          "then": {
+            "required": ["commitment_id"],
+            "properties": {
+              "commitment_id": {
+                "pattern": "^[A-Za-z0-9_-]+$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "act": {
+                "enum": ["ASSIGN"]
+              }
+            }
+          },
+          "then": {
+            "required": ["owner"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "act": {
+                "enum": ["REVISE"]
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": ["new_owner"]
+              },
+              {
+                "required": ["new_due"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
