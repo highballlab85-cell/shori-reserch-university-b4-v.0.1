@@ -81,6 +81,7 @@ CONTRADICTION_SUGGESTIONS = {
     "unauthorized_cancel": "コミットメントのオーナー本人、または合意を得たファシリテータがキャンセルを宣言できる状況に揃える。",
     "duplicate_cancel": "一度キャンセルした場合は進行ログを共有し、重複報告を避ける運用にする。",
     "cancel_before_confirmation": "REVISE/ASSIGN後は担当者のCONFIRMを待ち、必要に応じてリマインドを送る。",
+    "missing_confirmation": "ASSIGN/REVISE後の確認が抜けていないかを点検し、担当者から明示的なCONFIRM発話を得る。",
 }
 
 
@@ -184,6 +185,20 @@ def analyse_meeting(meeting: MeetingRecord) -> Dict[str, object]:
             if state is None:
                 state = commitments.setdefault(cid, CommitmentState(cid))
             state.record(event)
+
+    for state in commitments.values():
+        if state.requires_confirmation:
+            last_event = state.history[-1] if state.history else {}
+            contradictions.append(
+                {
+                    "turn": last_event.get("turn"),
+                    "commitment_id": state.commitment_id,
+                    "type": "missing_confirmation",
+                    "speaker": state.owner or last_event.get("speaker"),
+                    "detail": "ASSIGN/REVISE後にCONFIRMが未完了",
+                    "suggestion": suggest_action("missing_confirmation"),
+                }
+            )
 
     graph = build_graph(meeting.utterances)
 

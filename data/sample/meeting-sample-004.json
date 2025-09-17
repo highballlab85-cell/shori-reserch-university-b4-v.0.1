@@ -1,0 +1,71 @@
+{
+  "meeting_id": "sample-004",
+  "topic": "QA引き継ぎ確認ミーティング",
+  "open_questions": [
+    {
+      "question_id": "Q1",
+      "text": "C7の締切変更は誰が承認するか?",
+      "status": "open",
+      "raised_by": "Eve",
+      "raised_turn": 4,
+      "commitment_refs": ["C7"],
+      "notes": "改訂後の確認フローが未確定"
+    }
+  ],
+  "utterances": [
+    {
+      "turn": 1,
+      "timestamp": "00:00:05",
+      "speaker": "Alice",
+      "text": "Bob、木曜までにQA引継ぎドキュメントを作成して。",
+      "act": "ASSIGN",
+      "commitment_id": "C7",
+      "task": "QA引継ぎドキュメント作成",
+      "owner": "Bob",
+      "due": "2025-09-25"
+    },
+    {
+      "turn": 2,
+      "timestamp": "00:00:18",
+      "speaker": "Bob",
+      "text": "了解、内容を確認して進めます。",
+      "act": "OTHER"
+    },
+    {
+      "turn": 3,
+      "timestamp": "00:01:30",
+      "speaker": "Carol",
+      "text": "C7は締切を金曜までに延長しよう。",
+      "act": "REVISE",
+      "commitment_id": "C7",
+      "new_due": "2025-09-26"
+    },
+    {
+      "turn": 4,
+      "timestamp": "00:01:42",
+      "speaker": "Eve",
+      "text": "承認プロセスを整理するまでC7は保留にしておこう。",
+      "act": "OTHER",
+      "question_refs": ["Q1"]
+    },
+    {
+      "turn": 5,
+      "timestamp": "00:02:10",
+      "speaker": "Dave",
+      "text": "Eve、火曜までにテストケースのレビューをお願い。",
+      "act": "ASSIGN",
+      "commitment_id": "C8",
+      "task": "テストケースレビュー",
+      "owner": "Eve",
+      "due": "2025-09-23"
+    },
+    {
+      "turn": 6,
+      "timestamp": "00:02:18",
+      "speaker": "Eve",
+      "text": "はい、火曜までにレビューを完了します。",
+      "act": "CONFIRM",
+      "commitment_id": "C8"
+    }
+  ]
+}
