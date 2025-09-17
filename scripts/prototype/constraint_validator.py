@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """C2-Graph コミットメント制約バリデータ (MVP)。
 
-- 会議JSONを読み込み、Pydanticで構造を検証
+- 会議JSONを読み込み、軽量データクラスモデルで構造を検証
 - OR-Tools CP-SAT が利用可能なら遷移制約を充足可能性チェック
-- 手続き的なルールで権限違反や重複キャンセル等を検出
+- 手続き的なルールで権限違反や重複キャンセル、確認漏れ等を検出
 - Markdown/JSON の簡易レポートを生成
 """
 from __future__ import annotations
@@ -177,6 +177,19 @@ class ConstraintValidator:
                 self._validate_cancel(context, event, violations)
                 context.requires_confirmation = False
                 context.state = CommitmentStateEnum.CANCELLED
+
+        if context.requires_confirmation and events:
+            last_event = events[-1]
+            violations.append(
+                ConstraintViolation(
+                    commitment_id=context.commitment_id,
+                    turn=last_event.turn,
+                    violation_type="missing_confirmation",
+                    description="ASSIGN/REVISE 後に CONFIRM が未完了",
+                    speaker=context.owner or last_event.speaker,
+                    severity="warning",
+                )
+            )
 
         return violations
 
