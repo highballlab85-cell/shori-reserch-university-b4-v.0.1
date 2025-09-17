@@ -1,0 +1,8 @@
+decision_horizon_days: 14
+success:
+  novelty: "差分を1行で説明でき、主要関連研究を明示できる"
+  feasibility: "8週間・小規模データでMVR達成"
+  evaluation: "公開コーパス or 人手評価で測定可能"
+failure:
+  - "上記のうち2項目以上を満たせない"
+  - "評価指標が曖昧で比較不能"
