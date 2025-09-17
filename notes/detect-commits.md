@@ -42,5 +42,11 @@
 - 追加文献探索: "commitment graph dialogue", "task responsibility extraction"。
 - 自前アノテーション設計案のドラフトを `docs/` に作成。
 
+## 5. 追加実験ログ（2025-09-18）
+- `scripts/prototype/c2_graph_baseline.py` に `missing_confirmation` ルールを追加し、ASSIGN/REVISE 後に CONFIRM が得られないコミットメントを検出できるようにした。
+- サンプル会議 `meeting-sample-004.json` を作成し、`REVISE` 後に承認が保留されたケースと未解決質問 (`open_questions`) の連携をテスト。
+- 4件のサンプル会議に対するバッチ集計では、矛盾タイプに `missing_confirmation` が新たに加わり、矛盾コミットメント数6件・矛盾率0.60を確認。確認漏れを担当者ベースでリマインドする提案文が生成されることを検証。
+- `missing_confirmation` を含む複数矛盾が同一ターンに並ぶケースで最優先の提案だけを残すよう `c2_graph_baseline` を更新し、レポートでは各コミットメントに対して最も重大な指摘のみを提示するよう調整。
+
 ---
-担当: Codex CLIエージェント / 更新日: 2025-09-17
+担当: Codex CLIエージェント / 更新日: 2025-09-18

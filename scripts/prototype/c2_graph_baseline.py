@@ -19,7 +19,7 @@ import json
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 try:
     import networkx as nx
@@ -81,6 +81,16 @@ CONTRADICTION_SUGGESTIONS = {
     "unauthorized_cancel": "コミットメントのオーナー本人、または合意を得たファシリテータがキャンセルを宣言できる状況に揃える。",
     "duplicate_cancel": "一度キャンセルした場合は進行ログを共有し、重複報告を避ける運用にする。",
     "cancel_before_confirmation": "REVISE/ASSIGN後は担当者のCONFIRMを待ち、必要に応じてリマインドを送る。",
+    "missing_confirmation": "ASSIGN/REVISE後の確認が抜けていないかを点検し、担当者から明示的なCONFIRM発話を得る。",
+}
+
+
+CONTRADICTION_PRIORITIES = {
+    "cancel_without_assignment": 500,
+    "unauthorized_cancel": 400,
+    "duplicate_cancel": 300,
+    "cancel_before_confirmation": 200,
+    "missing_confirmation": 100,
 }
 
 
@@ -93,7 +103,41 @@ def suggest_action(contradiction_type: str) -> str:
 
 def analyse_meeting(meeting: MeetingRecord) -> Dict[str, object]:
     commitments: Dict[str, CommitmentState] = {}
-    contradictions: List[dict] = []
+    contradiction_candidates: Dict[Tuple[str, Optional[int]], dict] = {}
+    order_index: Dict[Tuple[str, Optional[int]], int] = {}
+    order_seq = 0
+
+    def register_contradiction(
+        turn: Optional[int],
+        commitment_id: str,
+        contradiction_type: str,
+        speaker: Optional[str],
+        detail: str,
+    ) -> None:
+        nonlocal order_seq
+
+        key = (commitment_id, turn)
+        priority = CONTRADICTION_PRIORITIES.get(contradiction_type, 0)
+        order = order_index.get(key)
+        if order is None:
+            order = order_seq
+            order_index[key] = order
+            order_seq += 1
+
+        candidate = {
+            "turn": turn,
+            "commitment_id": commitment_id,
+            "type": contradiction_type,
+            "speaker": speaker,
+            "detail": detail,
+            "suggestion": suggest_action(contradiction_type),
+            "_priority": priority,
+            "_order": order,
+        }
+
+        current = contradiction_candidates.get(key)
+        if current is None or priority > current["_priority"]:
+            contradiction_candidates[key] = candidate
 
     for event in meeting.utterances:
         act = event.act.upper()
@@ -132,49 +176,37 @@ def analyse_meeting(meeting: MeetingRecord) -> Dict[str, object]:
                 state.status = "cancelled"
                 state.requires_confirmation = False
                 state.record(event)
-                contradictions.append(
-                    {
-                        "turn": event.turn,
-                        "commitment_id": cid,
-                        "type": "cancel_without_assignment",
-                        "speaker": event.speaker,
-                        "detail": "ASSIGN前にCANCELが発生",
-                        "suggestion": suggest_action("cancel_without_assignment"),
-                    }
+                register_contradiction(
+                    turn=event.turn,
+                    commitment_id=cid,
+                    contradiction_type="cancel_without_assignment",
+                    speaker=event.speaker,
+                    detail="ASSIGN前にCANCELが発生",
                 )
                 continue
             if state.owner and event.speaker != state.owner:
-                contradictions.append(
-                    {
-                        "turn": event.turn,
-                        "commitment_id": cid,
-                        "type": "unauthorized_cancel",
-                        "speaker": event.speaker,
-                        "detail": f"オーナー({state.owner})以外がCANCEL",
-                        "suggestion": suggest_action("unauthorized_cancel"),
-                    }
+                register_contradiction(
+                    turn=event.turn,
+                    commitment_id=cid,
+                    contradiction_type="unauthorized_cancel",
+                    speaker=event.speaker,
+                    detail=f"オーナー({state.owner})以外がCANCEL",
                 )
             elif state.status == "cancelled":
-                contradictions.append(
-                    {
-                        "turn": event.turn,
-                        "commitment_id": cid,
-                        "type": "duplicate_cancel",
-                        "speaker": event.speaker,
-                        "detail": "既にCANCEL済みのコミットメント",
-                        "suggestion": suggest_action("duplicate_cancel"),
-                    }
+                register_contradiction(
+                    turn=event.turn,
+                    commitment_id=cid,
+                    contradiction_type="duplicate_cancel",
+                    speaker=event.speaker,
+                    detail="既にCANCEL済みのコミットメント",
                 )
             if state.requires_confirmation:
-                contradictions.append(
-                    {
-                        "turn": event.turn,
-                        "commitment_id": cid,
-                        "type": "cancel_before_confirmation",
-                        "speaker": event.speaker,
-                        "detail": "REVISE/ASSIGN の確認前にCANCEL",
-                        "suggestion": suggest_action("cancel_before_confirmation"),
-                    }
+                register_contradiction(
+                    turn=event.turn,
+                    commitment_id=cid,
+                    contradiction_type="cancel_before_confirmation",
+                    speaker=event.speaker,
+                    detail="REVISE/ASSIGN の確認前にCANCEL",
                 )
             state.status = "cancelled"
             state.requires_confirmation = False
@@ -185,7 +217,29 @@ def analyse_meeting(meeting: MeetingRecord) -> Dict[str, object]:
                 state = commitments.setdefault(cid, CommitmentState(cid))
             state.record(event)
 
+    for state in commitments.values():
+        if state.requires_confirmation:
+            last_event = state.history[-1] if state.history else {}
+            register_contradiction(
+                turn=last_event.get("turn"),
+                commitment_id=state.commitment_id,
+                contradiction_type="missing_confirmation",
+                speaker=state.owner or last_event.get("speaker"),
+                detail="ASSIGN/REVISE後にCONFIRMが未完了",
+            )
+
     graph = build_graph(meeting.utterances)
+
+    contradictions = sorted(
+        contradiction_candidates.values(),
+        key=lambda item: (
+            item["_order"],
+            item["turn"] if item.get("turn") is not None else float("inf"),
+        ),
+    )
+    for item in contradictions:
+        item.pop("_order", None)
+        item.pop("_priority", None)
 
     metrics = summarise_metrics(commitments, contradictions)
 
